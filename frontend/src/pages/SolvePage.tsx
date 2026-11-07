@@ -1,7 +1,7 @@
 import { Fragment, useEffect, useMemo, useState } from 'react';
 import { create } from 'zustand';
 import { Badge, Card, Check, confirmDialog, IssueList, NumInput, PageHeader } from '../components/ui';
-import { cancelJob, getJob, health, startSolve, type Diagnosis, type Job } from '../logic/api';
+import { cancelJob, getJob, health, LOCAL_SERVER, servedLocally, startSolve, type Diagnosis, type Job } from '../logic/api';
 import { checkData, isBlocking } from '../logic/checks';
 import { validateSchedule } from '../logic/conflicts';
 import { computeMetrics, CRITERIA_WEIGHTS, STRATEGIES, type Metrics } from '../logic/metrics';
@@ -225,6 +225,18 @@ export default function SolvePage() {
             {server ? server.text : 'Verificando o motor de otimização…'}{' '}
             {server && !server.ok && <button className="btn small" onClick={checkServer}>Tentar novamente</button>}
           </div>
+          {server && !server.ok && !servedLocally() && (
+            <div className="note warn">
+              <b>Como gerar a grade a partir desta versão online:</b>
+              <ol style={{ margin: '6px 0 0', paddingLeft: 18 }}>
+                <li>Baixe o sistema em <a href="https://github.com/marcioalbinods/grade-horaria-emef-oliveira-viana/archive/refs/heads/main.zip">github.com/marcioalbinods/grade-horaria-emef-oliveira-viana</a> (arquivo ZIP) e descompacte.</li>
+                <li>Instale o Python 3.10+ (no Windows, marque "Add Python to PATH").</li>
+                <li>Abra <b>iniciar.bat</b> (Windows) ou <b>iniciar.sh</b> (Linux/macOS) e deixe a janela aberta.</li>
+                <li>Volte aqui e clique em "Tentar novamente". Se o navegador perguntar, permita o acesso à rede local ({LOCAL_SERVER}).</li>
+              </ol>
+              <p className="small" style={{ marginTop: 6 }}>Use Chrome, Edge ou Firefox (o Safari bloqueia essa conexão). Alternativa: use diretamente o endereço {LOCAL_SERVER} aberto pelo "iniciar" — mas lembre que os dados de cada endereço ficam separados (use backup e restauração para levá-los de um para o outro).</p>
+            </div>
+          )}
           <p className="field-label">Gerar uma grade para cada prioridade marcada:</p>
           {STRATEGIES.map((s) => (
             <div key={s.id}>

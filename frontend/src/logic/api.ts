@@ -50,8 +50,22 @@ export interface Job {
   error?: string;
 }
 
+export const LOCAL_SERVER = 'http://127.0.0.1:8000';
+
+/** A página está sendo servida pelo próprio motor (iniciar.bat)? */
+export function servedLocally(): boolean {
+  if (typeof location === 'undefined') return true;
+  return ['localhost', '127.0.0.1', '[::1]'].includes(location.hostname);
+}
+
+/** Endereço do motor: o configurado, o mesmo da página (uso local) ou o motor local (GitHub Pages). */
+export function serverBase(serverUrl: string): string {
+  if (serverUrl) return serverUrl.replace(/\/+$/, '');
+  return servedLocally() ? '' : LOCAL_SERVER;
+}
+
 function base(serverUrl: string) {
-  return (serverUrl || '').replace(/\/+$/, '');
+  return serverBase(serverUrl);
 }
 
 async function req<T>(url: string, init?: RequestInit): Promise<T> {
@@ -59,7 +73,9 @@ async function req<T>(url: string, init?: RequestInit): Promise<T> {
   try {
     res = await fetch(url, init);
   } catch {
-    throw new Error('Não foi possível conectar ao motor de otimização. Verifique se o programa foi iniciado pelo arquivo "iniciar" (servidor local).');
+    throw new Error(servedLocally()
+      ? 'Não foi possível conectar ao motor de otimização. Verifique se o programa foi iniciado pelo arquivo "iniciar" (servidor local).'
+      : `Não foi possível conectar ao motor de otimização em ${LOCAL_SERVER}. Nesta versão online, o motor precisa estar rodando no seu computador: baixe o sistema e abra o arquivo "iniciar" (veja as instruções abaixo).`);
   }
   if (!res.ok) {
     let detail = '';
