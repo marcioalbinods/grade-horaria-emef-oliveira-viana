@@ -26,6 +26,16 @@ aparentemente válida**: ele mostra quais restrições, juntas, impedem a montag
 > automático. Use **Configurações e backups → Baixar backup completo** regularmente.
 > Nenhum dado é enviado para a internet. O sistema não coleta nomes de estudantes.
 
+### Versão online (GitHub Pages)
+
+A interface também está publicada em **<https://marcioalbinods.github.io/grade-horaria-emef-oliveira-viana/>**.
+Nela funcionam os cadastros, a visualização e edição das grades, os relatórios e os backups.
+Para **gerar** a grade, o motor de otimização precisa estar rodando no seu computador (passos 1–4
+acima): a página online se conecta a ele em `http://127.0.0.1:8000`. Use Chrome, Edge ou Firefox e,
+se o navegador pedir, permita o acesso à rede local. Os dados da versão online e da versão aberta
+pelo `iniciar` ficam separados (cada endereço tem seu próprio armazenamento); use backup e
+restauração para levá-los de uma para a outra.
+
 Quer só conhecer? Em **Configurações e backups → Outras opções → Carregar demonstração** há uma
 escola **fictícia** completa. Seus dados reais ficam guardados e voltam com "Voltar aos dados reais".
 

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { ConfirmHost } from './components/ui';
+import { servedLocally } from './logic/api';
 import { useStore, type PageId } from './store';
 import Dashboard from './pages/Dashboard';
 import SchoolPage from './pages/SchoolPage';
@@ -71,7 +72,7 @@ export default function App() {
     <div className={'app' + (menuOpen ? ' menu-open' : '')}>
       <aside className="sidebar no-print">
         <div className="brand">
-          <img src="/icon.svg" alt="" />
+          <img src={`${import.meta.env.BASE_URL}icon.svg`} alt="" />
           <div>
             <strong>Grade Horária</strong>
             <span>{school || 'Escola'}</span>
@@ -101,7 +102,7 @@ export default function App() {
           <div className={'save-state ' + saveState}>
             {saveState === 'salvando' ? 'Salvando…' : saveState === 'erro' ? '⚠ Erro ao salvar' : `✓ Salvo${savedAt ? ' às ' + new Date(savedAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : ''}`}
           </div>
-          <div>Os dados ficam armazenados <b>somente neste navegador e neste computador</b>. Faça backups regularmente.</div>
+          <div>Os dados ficam armazenados <b>somente neste navegador e neste computador</b>{!servedLocally() && <> (nesta versão online, separados dos dados da versão local)</>}. Faça backups regularmente.</div>
         </div>
       </aside>
       <div className="main">

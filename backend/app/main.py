@@ -13,6 +13,7 @@ Nenhum dado é armazenado no servidor: os dados ficam no navegador do usuário.
 """
 from __future__ import annotations
 
+import inspect
 import os
 import threading
 import time
@@ -30,7 +31,20 @@ from .schemas import ProblemIn
 from .solver import STRATEGY_WEIGHTS, diagnose, solve_strategy
 
 app = FastAPI(title="Grade Horária – EMEF Oliveira Viana", version="1.0.0")
-app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
+_cors = {"allow_origins": ["*"], "allow_methods": ["*"], "allow_headers": ["*"]}
+if "allow_private_network" in inspect.signature(CORSMiddleware.__init__).parameters:
+    _cors["allow_private_network"] = True  # versões recentes do Starlette
+app.add_middleware(CORSMiddleware, **_cors)
+
+
+@app.middleware("http")
+async def private_network_access(request, call_next):
+    """Permite que a versão publicada no GitHub Pages (site público) use o motor
+    rodando neste computador (rede local), conforme o padrão Private Network Access."""
+    response = await call_next(request)
+    if request.headers.get("access-control-request-private-network") == "true":
+        response.headers["Access-Control-Allow-Private-Network"] = "true"
+    return response
 
 JOBS: dict[str, dict] = {}
 LOCK = threading.Lock()
