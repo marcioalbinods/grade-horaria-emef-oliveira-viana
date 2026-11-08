@@ -30,7 +30,10 @@ from .precheck import precheck
 from .schemas import ProblemIn
 from .solver import STRATEGY_WEIGHTS, diagnose, solve_strategy
 
-app = FastAPI(title="Grade Horária – EMEF Oliveira Viana", version="1.0.0")
+VERSION = "1.1.0"
+FEATURES = ["jeif"]  # recursos que a interface exige do motor
+
+app = FastAPI(title="Grade Horária – EMEF Oliveira Viana", version=VERSION)
 _cors = {"allow_origins": ["*"], "allow_methods": ["*"], "allow_headers": ["*"]}
 if "allow_private_network" in inspect.signature(CORSMiddleware.__init__).parameters:
     _cors["allow_private_network"] = True  # versões recentes do Starlette
@@ -113,7 +116,7 @@ def run_job(job_id: str, problem: ProblemIn) -> None:
 
 @app.get("/api/health")
 def health():
-    return {"ok": True, "ortools": ortools.__version__, "solver": "CP-SAT"}
+    return {"ok": True, "ortools": ortools.__version__, "solver": "CP-SAT", "version": VERSION, "features": FEATURES}
 
 
 @app.post("/api/precheck")

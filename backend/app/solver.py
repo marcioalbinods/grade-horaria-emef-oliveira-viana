@@ -162,6 +162,12 @@ class ModelBuilder:
                             f"Dias de trabalho de {t.name}",
                             f"Inclua mais dias de trabalho para {t.name} ou reduza suas aulas.",
                             [t.id]))
+        if (pid, d, s) in self._jeif[t.id]:
+            reasons.append(("tjeif:" + t.id, "jeif",
+                            f"Horário de JEIF ({t.jeifName}) de {t.name}",
+                            f"Revise o agrupamento de JEIF de {t.name}, os horários do grupo ou redistribua "
+                            "aulas desse professor.",
+                            [t.id]))
         if (pid, d, s) in self._unavail[t.id]:
             reasons.append(("tunav:" + t.id, "indisponibilidade",
                             f"Horários indisponíveis de {t.name}",
@@ -186,6 +192,7 @@ class ModelBuilder:
     def build(self):
         p, m = self.p, self.m
         self._unavail = {t.id: {tuple(u) for u in t.unavailable} for t in p.teachers}
+        self._jeif = {t.id: {tuple(u) for u in t.jeifBlocked} for t in p.teachers}
         D = self.D
 
         # ---- variáveis de aula
@@ -299,6 +306,7 @@ class ModelBuilder:
         # ---- limites do professor
         for t in p.teachers:
             self._teacher_limits(t)
+            self._jeif_no_gap(t)
 
         if self.mode == "solve":
             self._objective()  # no modo "check" não há objetivo: só viabilidade
@@ -420,6 +428,31 @@ class ModelBuilder:
                             else:
                                 m.Add(nxt == 1).OnlyEnforceIf(enf)
 
+
+    def _jeif_no_gap(self, t):
+        """Sem horário vago entre as aulas do período anterior e a JEIF: nos dias
+        indicados, a ocupação do professor no período forma um bloco que termina na
+        última aula (ou o professor não tem aulas nesse período no dia)."""
+        if not t.jeifNoGap:
+            return
+        key = "tjeifgap:" + t.id
+        if key in self.disabled:
+            return
+        lit = self.group(key, "jeif", f"Sem horário vago antes da JEIF ({t.jeifName}) para {t.name}",
+                         f"Nos dias de JEIF, as aulas de {t.name} precisam ir até a última aula do período. "
+                         "Verifique indisponibilidades e limites que impedem isso, ou redistribua aulas.",
+                         [t.id])
+        for pid, d in {tuple(x) for x in t.jeifNoGap}:
+            n = self.nslots.get(pid, 0)
+            for s in range(n - 1):
+                cur = self.teacher_occ.get((t.id, pid, d, s), [])
+                nxt = self.teacher_occ.get((t.id, pid, d, s + 1), [])
+                if not cur:
+                    continue
+                if not nxt:
+                    self.enforce(self.m.Add(sum(cur) == 0), lit)
+                else:
+                    self.enforce(self.m.Add(sum(cur) <= sum(nxt)), lit)
 
     def _teacher_limits(self, t):
         m, D = self.m, self.D
@@ -690,7 +723,7 @@ def solve_strategy(problem: ProblemIn, strategy: str, weights: Weights, time_lim
 
 
 GROUP_COST = {"fixada": 1, "atividade": 2, "limite": 2, "entrada": 3, "turma": 3,
-              "indisponibilidade": 4, "dias": 5}
+              "indisponibilidade": 4, "dias": 5, "jeif": 6}
 
 
 def _is_infeasible(problem: ProblemIn, disabled: set[str], time_limit: float) -> Optional[bool]:

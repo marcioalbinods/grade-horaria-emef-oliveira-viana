@@ -67,6 +67,10 @@ class TeacherIn(BaseModel):
     maxDays: Optional[int] = None  # preferência: no máximo N dias
     preferConsecutive: bool = False
     avoidGaps: bool = False
+    # JEIF (Jornada Especial Integral de Formação)
+    jeifName: Optional[str] = None
+    jeifBlocked: list[tuple[str, int, int]] = []  # horários que coincidem com a JEIF
+    jeifNoGap: list[tuple[str, int]] = []  # (periodo, dia): aulas devem ir até a última aula
 
 
 class AssignmentIn(BaseModel):

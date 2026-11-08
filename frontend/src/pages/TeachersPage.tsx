@@ -6,6 +6,38 @@ import { className, sortedClasses, uid } from '../logic/util';
 import { useData, useStore } from '../store';
 import type { Teacher } from '../types';
 import { linkTeacherSubject } from './MatrixPage';
+import { jeifInfo, jeifLabel, periodBeforeJeif } from '../logic/jeif';
+
+function JeifField({ t }: { t: Teacher }) {
+  const data = useData();
+  const update = useStore((s) => s.update);
+  const info = jeifInfo(data, t);
+  const g = info.group;
+  const days = data.school.days;
+  const before = g?.noGapBefore ? periodBeforeJeif(data, g) : null;
+  const blockedCount = info.blocked.size;
+  return (
+    <Field label="Agrupamento de JEIF (Jornada Especial Integral de Formação)"
+      hint={<>Os horários dos grupos podem ser ajustados em "Configuração da escola".</>}>
+      <select className="input" style={{ maxWidth: 420 }} value={t.jeifGroupId ?? ''} aria-label="Agrupamento de JEIF"
+        onChange={(e) => update((d) => { d.teachers.find((x) => x.id === t.id)!.jeifGroupId = e.target.value || null; })}>
+        <option value="">Não faz JEIF</option>
+        {data.school.jeifGroups.map((jg) => <option key={jg.id} value={jg.id}>{jeifLabel(jg, days)}</option>)}
+      </select>
+      {g && (
+        <div className="note" style={{ marginTop: 6, marginBottom: 0 }}>
+          {info.invalid ? <span className="err-text">{info.invalid}</span>
+            : info.missingTimes.length ? <span className="warn-text">Configure os horários das aulas do(s) período(s) {info.missingTimes.join(', ')} para o sistema saber quais aulas coincidem com a JEIF.</span>
+            : <>
+                Durante a JEIF ({g.start}–{g.end}, {g.days.filter((x) => x < days.length).map((x) => days[x]).join(', ')}) o professor não recebe aulas:
+                {' '}<b>{blockedCount}</b> horário(s) de aula bloqueado(s) por semana.
+                {before && t.periodIds.includes(before.id) && <> Nesses dias, as aulas do período <b>{before.name}</b> seguem até a última aula, sem horário vago antes da JEIF.</>}
+              </>}
+        </div>
+      )}
+    </Field>
+  );
+}
 
 function PeriodQuestion({ t }: { t: Teacher }) {
   const data = useData();
@@ -189,6 +221,7 @@ export default function TeachersPage() {
                 <TextInput value={t.name} required onChange={(v) => update((d) => { d.teachers.find((x) => x.id === t.id)!.name = v; })} />
               </Field>
               <PeriodQuestion t={t} />
+              <JeifField t={t} />
               <Field label="Disciplina(s) que leciona">
                 <div className="row">
                   {data.subjects.length === 0 && <span className="muted small">Nenhuma disciplina cadastrada.</span>}

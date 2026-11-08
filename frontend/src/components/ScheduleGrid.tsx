@@ -2,6 +2,7 @@ import { Fragment, useMemo, useState, type ReactNode } from 'react';
 import { describeEntry, newConflicts, swapEntries, validateSchedule, validTargets, type Violation } from '../logic/conflicts';
 import { ACTIVITY_LABELS, className, contrastText, entryKey, indexData, slotTime } from '../logic/util';
 import { useStore } from '../store';
+import { jeifInfo } from '../logic/jeif';
 import type { AppData, Entry, Period, Schedule } from '../types';
 import { Badge, Modal } from './ui';
 
@@ -73,6 +74,11 @@ export function ScheduleGrid({ data, schedule, period, mode, violations }: Props
     });
   }, [mine, days, mode.kind]);
   const cls = mode.kind === 'turma' ? ix.cls.get(mode.classId) : undefined;
+  const jeif = useMemo(() => {
+    if (mode.kind !== 'professor') return null;
+    const t = ix.teacher.get(mode.teacherId);
+    return t ? jeifInfo(data, t) : null;
+  }, [data, ix, mode]);
 
   const alternativesFor = (key: string) =>
     validTargets(data, entries, key).map((t) => ({
@@ -114,6 +120,8 @@ export function ScheduleGrid({ data, schedule, period, mode, violations }: Props
         const label = blocked ? 'Bloqueado' : cls.freePolicy === 'reservado' ? 'Reservado' : 'Livre';
         return <div className={'cell ' + (blocked ? 'blocked' : 'free ' + cls.freePolicy) + target} {...common}>{label}</div>;
       }
+      if (jeif?.blocked.has(`${period.id}|${d}|${s}`))
+        return <div className={'cell blocked' + target} {...common} title={`JEIF ${jeif.group?.name} (${jeif.group?.start}–${jeif.group?.end})`}>JEIF</div>;
       const sp = span?.[d];
       if (sp && s > sp[0] && s < sp[1]) return <div className={'cell gap' + target} {...common}>Janela</div>;
       return <div className={'cell free' + target} {...common} />;

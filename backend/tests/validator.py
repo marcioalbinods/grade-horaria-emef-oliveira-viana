@@ -89,6 +89,8 @@ def validate(problem: dict, entries: list[dict]) -> list[str]:
             errs.append(f"{t['name']} alocado em dia em que não trabalha ({d})")
         if [pid, d, s] in [list(u) for u in t.get("unavailable", [])]:
             errs.append(f"{t['name']} alocado em horário indisponível ({pid},{d},{s})")
+        if [pid, d, s] in [list(u) for u in t.get("jeifBlocked", [])]:
+            errs.append(f"{t['name']} alocado em horário de JEIF ({pid},{d},{s})")
         lo = t.get("entry", {}).get(pid)
         hi = t.get("exit", {}).get(pid)
         if (lo is not None and s < lo) or (hi is not None and s > hi):
@@ -171,6 +173,12 @@ def validate(problem: dict, entries: list[dict]) -> list[str]:
                         if run > k:
                             errs.append(f"{t['name']} excede {k} aulas consecutivas")
                             break
+    # JEIF: sem horário vago entre as aulas do período anterior e a JEIF
+    for t in teachers.values():
+        for pid, d in t.get("jeifNoGap", []):
+            sl = sorted(s for (tid, p, dd, s) in teacher_occ if tid == t["id"] and p == pid and dd == d)
+            if sl and sl != list(range(sl[0], nslots[pid])):
+                errs.append(f"{t['name']}: horário vago antes da JEIF no dia {d} ({sl})")
     for lk in problem.get("locks", []):
         if not any(e["kind"] == lk["kind"] and e["refId"] == lk["refId"] and e["day"] == lk["day"]
                    and e["slot"] == lk["slot"] for e in entries):

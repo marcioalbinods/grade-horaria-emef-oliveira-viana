@@ -31,6 +31,7 @@ def wait(job_id, timeout=600):
 def test_health():
     r = client.get("/api/health").json()
     assert r["ok"] and r["solver"] == "CP-SAT"
+    assert "jeif" in r["features"]
 
 
 def test_solve_job_multiple_strategies():

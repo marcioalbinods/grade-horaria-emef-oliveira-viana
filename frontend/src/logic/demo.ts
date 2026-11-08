@@ -125,6 +125,10 @@ export function demoData(): AppData {
   specialists[HIS][0].availability.unavailable = ['per_tarde|4|4', 'per_tarde|4|5'];
   specialists[GEO][1].availability.avoid = ['per_tarde|0|0', 'per_tarde|0|1'];
   specialists[GEO][1].availability.maxDays = 4;
+  // JEIF (exemplos fictícios)
+  specialists[MAT][1].jeifGroupId = 'jeif_3'; // Grupo III, tarde: aulas até a última aula de seg a qui
+  specialists[GEO][0].jeifGroupId = 'jeif_2'; // Grupo II: sem aulas das 14h às 15h30 de seg a qui
+  LE1.jeifGroupId = 'jeif_1'; // Grupo I: sem aulas das 10h30 às 12h de seg a qui
   for (const t of d.teachers) {
     if (t.workload.regular == null) {
       const les = d.assignments.filter((a) => a.teacherId === t.id).reduce((s, a) => s + a.lessons, 0);

@@ -98,11 +98,23 @@ export interface Workload {
   others: OtherWork[];
 }
 
+/** Agrupamento de JEIF (Jornada Especial Integral de Formação). */
+export interface JeifGroup {
+  id: ID;
+  name: string; // "Grupo I"
+  start: string; // "10:30"
+  end: string; // "12:00"
+  days: number[]; // índices dos dias letivos (padrão: segunda a quinta)
+  /** Sem horário vago entre as aulas do período imediatamente anterior e a JEIF. */
+  noGapBefore: boolean;
+}
+
 export interface Teacher {
   id: ID;
   name: string;
   subjectIds: ID[];
   periodIds: ID[];
+  jeifGroupId: ID | null;
   workload: Workload;
   availability: Availability;
   notes: string;
@@ -162,6 +174,7 @@ export interface SchoolConfig {
   lessonMinutes: number;
   workload: WorkloadConfig;
   defaultFreePolicy: FreePolicy;
+  jeifGroups: JeifGroup[];
   solver: { timeLimit: number; strategies: StrategyId[]; serverUrl: string };
 }
 

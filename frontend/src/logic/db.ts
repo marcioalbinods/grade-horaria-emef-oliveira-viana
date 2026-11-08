@@ -1,6 +1,6 @@
 // Armazenamento local no IndexedDB do navegador (sem servidor, sem serviços pagos).
 import type { AppData } from '../types';
-import { initialData, newAvailability, newWorkload } from './defaults';
+import { defaultJeifGroups, initialData, newAvailability, newWorkload } from './defaults';
 
 const DB_NAME = 'grade-horaria-emef-oliveira-viana';
 const STORE = 'kv';
@@ -89,6 +89,7 @@ export function normalizeData(raw: unknown): AppData {
       workload: { ...base.school.workload, ...(r.school.workload ?? {}),
         components: { ...base.school.workload.components, ...(r.school.workload?.components ?? {}) } },
       solver: { ...base.school.solver, ...(r.school.solver ?? {}) },
+      jeifGroups: Array.isArray(r.school.jeifGroups) ? r.school.jeifGroups : defaultJeifGroups(),
     },
     periods: r.periods.map((p) => ({ ...withDefaults({ breaks: [] }, p), slots: p.slots ?? [] })),
     cycles: r.cycles ?? [],
@@ -99,7 +100,7 @@ export function normalizeData(raw: unknown): AppData {
     pending: r.pending ?? [],
     subjects: r.subjects ?? [],
     teachers: (r.teachers ?? []).map((t) => ({
-      ...withDefaults({ subjectIds: [], periodIds: [], notes: '' }, t),
+      ...withDefaults({ subjectIds: [], periodIds: [], notes: '', jeifGroupId: null }, t),
       workload: { ...newWorkload(), ...(t.workload ?? {}) },
       availability: { ...newAvailability(days), ...(t.availability ?? {}) },
     })),

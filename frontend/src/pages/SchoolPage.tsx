@@ -1,4 +1,6 @@
-import { Card, Check, confirmDialog, Field, NumInput, PageHeader, TextInput } from '../components/ui';
+import { Card, Check, confirmDialog, Field, NumInput, PageHeader, TextInput, TimeInput } from '../components/ui';
+import { periodBeforeJeif } from '../logic/jeif';
+import { toMinutes, uid } from '../logic/util';
 import { WEEK_DAYS } from '../logic/defaults';
 import { trimDays } from '../logic/mutations';
 import { useData, useStore } from '../store';
@@ -11,6 +13,66 @@ const COMPONENTS: [WorkComponent, string][] = [
   ['HL', 'HL'],
   ['OUTRA', 'Outras atividades'],
 ];
+
+function JeifGroupsCard() {
+  const data = useData();
+  const update = useStore((s) => s.update);
+  const days = data.school.days;
+  const remove = async (id: string, name: string) => {
+    const n = data.teachers.filter((t) => t.jeifGroupId === id).length;
+    if (!(await confirmDialog('Excluir agrupamento de JEIF', <>Excluir o <b>{name}</b>?{n > 0 && <> {n} professor(es) desse grupo ficarão como “Não faz JEIF”.</>}</>, { danger: true, okLabel: 'Excluir' }))) return;
+    update((d) => {
+      d.school.jeifGroups = d.school.jeifGroups.filter((g) => g.id !== id);
+      for (const t of d.teachers) if (t.jeifGroupId === id) t.jeifGroupId = null;
+    });
+  };
+  const set = (id: string, fn: (g: (typeof data.school.jeifGroups)[number]) => void) =>
+    update((d) => fn(d.school.jeifGroups.find((g) => g.id === id)!));
+  return (
+    <Card title="Agrupamentos de JEIF (Jornada Especial Integral de Formação)"
+      actions={<button className="btn small" onClick={() => update((d) => { d.school.jeifGroups.push({ id: uid('jeif'), name: `Grupo ${d.school.jeifGroups.length + 1}`, start: '', end: '', days: [0, 1, 2, 3].filter((x) => x < d.school.days.length), noGapBefore: false }); })}>+ Novo agrupamento</button>}>
+      <p className="muted small">
+        O agrupamento de cada professor é escolhido no cadastro do professor. Nos dias marcados, o professor nunca recebe aulas cujo horário
+        coincida com a JEIF (o sistema compara com os horários reais cadastrados em “Cadastro de períodos”).
+      </p>
+      <div className="tbl-wrap">
+        <table className="tbl">
+          <thead><tr><th>Grupo</th><th>Início</th><th>Término</th><th>Dias</th><th>Sem horário vago antes da JEIF</th><th className="num">Professores</th><th></th></tr></thead>
+          <tbody>
+            {data.school.jeifGroups.map((g) => {
+              const a = toMinutes(g.start), b = toMinutes(g.end);
+              const before = periodBeforeJeif(data, g);
+              return (
+                <tr key={g.id}>
+                  <td><TextInput value={g.name} required onChange={(v) => set(g.id, (x) => { x.name = v; })} ariaLabel="Nome do grupo" /></td>
+                  <td><TimeInput value={g.start} onChange={(v) => set(g.id, (x) => { x.start = v; })} ariaLabel="Início da JEIF" /></td>
+                  <td>
+                    <TimeInput value={g.end} onChange={(v) => set(g.id, (x) => { x.end = v; })} ariaLabel="Término da JEIF" />
+                    {a != null && b != null && b <= a && <div className="field-error">Término antes do início.</div>}
+                  </td>
+                  <td>
+                    {days.map((dn, d) => (
+                      <Check key={d} label={dn.slice(0, 3)} checked={g.days.includes(d)}
+                        onChange={(v) => set(g.id, (x) => { x.days = v ? [...x.days, d].sort() : x.days.filter((y) => y !== d); })} />
+                    ))}
+                  </td>
+                  <td>
+                    <Check label={before ? `Aulas do período ${before.name} vão até a última aula` : 'Ativar'} checked={g.noGapBefore}
+                      onChange={(v) => set(g.id, (x) => { x.noGapBefore = v; })} />
+                  </td>
+                  <td className="num">{data.teachers.filter((t) => t.jeifGroupId === g.id).length}</td>
+                  <td><button className="btn small danger" onClick={() => remove(g.id, g.name)}>Excluir</button></td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+      <p className="muted small">“Sem horário vago antes da JEIF”: nos dias de JEIF, o professor que trabalha no período que termina imediatamente antes da JEIF
+        (por exemplo, a Tarde, para o Grupo III) tem suas aulas desse período terminando na última aula, sem aula vaga até a JEIF.</p>
+    </Card>
+  );
+}
 
 export default function SchoolPage() {
   const data = useData();
@@ -60,6 +122,7 @@ export default function SchoolPage() {
           </div>
         </Card>
       </div>
+      <JeifGroupsCard />
       <Card title="Como a jornada dos professores é contabilizada">
         <p className="muted small">
           A carga horária total não é presumida como soma das aulas. Defina a unidade de medida adotada pela escola, quais componentes entram na

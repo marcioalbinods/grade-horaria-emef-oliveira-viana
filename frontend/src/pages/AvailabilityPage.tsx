@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { SlotPicker } from '../components/SlotPicker';
 import { Card, Check, Empty, Field, NumInput, PageHeader } from '../components/ui';
 import { useData, useStore } from '../store';
+import { jeifInfo, jeifLabel } from '../logic/jeif';
 import type { Availability, Limit } from '../types';
 
 function LimitEditor(props: { label: string; value: Limit | null; max: number; onChange: (l: Limit | null) => void }) {
@@ -39,6 +40,7 @@ export default function AvailabilityPage() {
   const av = t?.availability;
   const set = (fn: (a: Availability) => void) => t && update((d) => fn(d.teachers.find((x) => x.id === t.id)!.availability));
   const days = data.school.days;
+  const jeif = t ? jeifInfo(data, t) : null;
   const maxSlots = t ? t.periodIds.reduce((s, pid) => s + (data.periods.find((p) => p.id === pid)?.slots.length ?? 0), 0) : 0;
 
   return (
@@ -69,6 +71,9 @@ export default function AvailabilityPage() {
               <Field label="Em quais períodos está disponível?">
                 <div>{t.periodIds.map((pid) => data.periods.find((p) => p.id === pid)?.name).join(', ') || <span className="err-text">nenhum</span>} <button className="btn link" onClick={() => go('professores', t.id)}>alterar no cadastro</button></div>
               </Field>
+              <Field label="JEIF">
+                <div>{jeifLabel(jeif?.group ?? null, days)}{jeif?.group && <> — horários marcados como <b>JEIF</b> na grade abaixo não recebem aulas.</>} <button className="btn link" onClick={() => go('professores', t.id)}>alterar no cadastro</button></div>
+              </Field>
               {t.periodIds.map((pid) => {
                 const p = data.periods.find((x) => x.id === pid);
                 if (!p) return null;
@@ -94,12 +99,13 @@ export default function AvailabilityPage() {
                       onSlot={(s) => toggleMany(days.map((_, d) => `${pid}|${d}|${s}`))}
                       look={(d, s) => {
                         const k = `${pid}|${d}|${s}`;
+                        if (jeif?.blocked.has(k)) return { cls: 'off', text: 'JEIF', title: `JEIF ${jeif.group?.name} (${jeif.group?.start}–${jeif.group?.end})` };
                         if ((lo != null && s < lo) || (hi != null && s > hi)) return { cls: 'off', text: '—', title: 'Fora do horário de entrada/saída' };
                         if (av.unavailable.includes(k)) return { cls: 'bad', text: 'Indisp.' };
                         if (av.avoid.includes(k)) return { cls: 'pref', text: 'Evitar' };
                         return { cls: 'on' };
                       }} />
-                    <div className="legend"><span className="l-on">Disponível</span><span className="l-bad">Indisponível (obrigatório)</span><span className="l-pref">Prefere evitar (preferência)</span><span className="l-off">Fora da entrada/saída</span></div>
+                    <div className="legend"><span className="l-on">Disponível</span><span className="l-bad">Indisponível (obrigatório)</span><span className="l-pref">Prefere evitar (preferência)</span><span className="l-off">Fora da entrada/saída ou JEIF</span></div>
                     <div className="row">
                       <Field label="Horário de entrada obrigatório (não pode ter aulas antes da…)">
                         <select className="input" value={lo ?? ''} onChange={(e) => set((a) => { a.entry[pid] = e.target.value === '' ? null : Number(e.target.value); })}>

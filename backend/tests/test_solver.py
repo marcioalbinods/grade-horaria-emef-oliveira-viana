@@ -283,3 +283,57 @@ def test_soft_limits_do_not_block():
     p = b.build()
     res = solve(p, tl=10)
     assert_valid(p, res)
+
+
+# ------------------------------------------------------------------ JEIF
+def jeif_case():
+    """Turma da tarde (6 aulas/dia) e professor do Grupo III (19h): nos dias de JEIF
+    (seg a qui) suas aulas devem terminar na última aula da tarde."""
+    b = SchoolBuilder()
+    b.cls("A", "6º A", "T", 30)
+    b.cls("B", "6º B", "T", 30)
+    b.teacher("J3", "Prof. JEIF III", ["T"], jeifName="Grupo III",
+              jeifNoGap=[["T", d] for d in range(4)])
+    b.teacher("J2", "Prof. JEIF II", ["T"], jeifName="Grupo II",
+              jeifBlocked=[["T", d, s] for d in range(4) for s in (0, 1, 2)])
+    b.teacher("X", "Prof. X", ["T"])
+    b.teacher("Y", "Prof. Y", ["T"])
+    b.assign("A", "J3", "MAT", 8)
+    b.assign("B", "J3", "MAT", 6)
+    b.assign("A", "J2", "POR", 8)
+    b.assign("B", "J2", "POR", 8)
+    b.assign("A", "X", "CIE", 14)
+    b.assign("B", "Y", "CIE", 16)
+    return b
+
+
+def test_jeif_blocked_and_no_gap_before_jeif():
+    p = jeif_case().build()
+    res = solve(p, tl=15)
+    assert_valid(p, res)
+    a_t = {a["id"]: a["teacherId"] for a in p["assignments"]}
+    for d in range(4):
+        sl = sorted(e["slot"] for e in res["entries"] if a_t[e["refId"]] == "J3" and e["day"] == d)
+        if sl:
+            assert sl == list(range(sl[0], 6)), (d, sl)  # bloco até a última aula
+        assert not [e for e in res["entries"] if a_t[e["refId"]] == "J2" and e["day"] == d and e["slot"] < 3]
+
+
+def test_jeif_no_gap_conflict_is_diagnosed():
+    b = jeif_case()
+    # indisponível na última aula de segunda a quinta: não consegue "ir até o fim"
+    b.p["teachers"][0]["unavailable"] = [["T", d, 5] for d in range(4)]
+    b.p["assignments"][0]["lessons"] = 10  # J3: 16 aulas, mas só a sexta (6 horários) fica possível
+    b.p["assignments"][4]["lessons"] = 12  # mantém a turma A com 30 aulas
+    prob = ProblemIn.model_validate(b.build())
+    res = solve_strategy(prob, "equilibrada", STRATEGY_WEIGHTS["equilibrada"], 10, 8)
+    assert res["status"] == "inviavel"
+    keys = {g["key"] for g in diagnose(prob, 30)["core"]}
+    assert "tjeifgap:J3" in keys
+
+
+def test_jeif_blocked_counted_in_precheck():
+    b = jeif_case()
+    b.p["assignments"][2]["lessons"] = 14  # J2: 14 + 8 = 22 > 30 - 12 = 18 horários
+    issues = precheck(ProblemIn.model_validate(b.build()))
+    assert any(i.category == "matematica" and "Prof. JEIF II" in i.message for i in issues)
