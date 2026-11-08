@@ -68,10 +68,14 @@ Restrições **obrigatórias** (nunca violadas):
 4. H.A., CCH, HL e outras atividades na quantidade cadastrada, respeitando dias, horários,
    modo fixo/flexível, máximo por dia e posição (início/fim do período, início/fim da jornada, meio).
 5. Indisponibilidades, dias de trabalho, horário de entrada/saída, períodos do professor.
-6. Limites de aulas diárias e consecutivas (quando marcados como obrigatórios).
-7. Turma só recebe aulas no seu período, respeitando horários bloqueados e limite diário.
-8. Turmas com menos aulas que horários (ex.: 27 e 24) ficam com os horários restantes **livres**.
-9. Aulas bloqueadas manualmente são mantidas em novas otimizações.
+6. **JEIF** (Jornada Especial Integral de Formação): o agrupamento de cada professor (Grupo I 10h30–12h00,
+   Grupo II 14h00–15h30, Grupo III 19h00–20h30, de segunda a quinta — ajustáveis em Configuração da escola)
+   bloqueia as aulas cujo horário coincide com a JEIF. No Grupo III, o professor da tarde não fica com
+   aula vaga entre as aulas do período e a JEIF (as aulas seguem até a última aula).
+7. Limites de aulas diárias e consecutivas (quando marcados como obrigatórios).
+8. Turma só recebe aulas no seu período, respeitando horários bloqueados e limite diário.
+9. Turmas com menos aulas que horários (ex.: 27 e 24) ficam com os horários restantes **livres**.
+10. Aulas bloqueadas manualmente são mantidas em novas otimizações.
 
 **Otimização** (pesos conforme a prioridade): janelas dos professores, dias e turnos de comparecimento,
 aulas isoladas, distribuição das disciplinas na semana, 3 aulas seguidas da mesma disciplina,
@@ -102,7 +106,7 @@ e2e/       teste de ponta a ponta no navegador (Playwright)
 ## Testes
 
 ```bash
-cd frontend && npm install && npm test          # 19 testes da lógica (conflitos, métricas, importação, relatórios…)
+cd frontend && npm install && npm test          # 26 testes da lógica (conflitos, métricas, importação, relatórios…)
 cd backend && .venv/bin/pip install -r requirements-dev.txt && .venv/bin/python -m pytest -q   # motor + API
 node e2e/e2e.cjs http://127.0.0.1:8000/          # com o servidor rodando
 ```

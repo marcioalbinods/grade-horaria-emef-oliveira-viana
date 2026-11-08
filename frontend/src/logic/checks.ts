@@ -2,6 +2,7 @@
 import type { PageId } from '../store';
 import type { AppData } from '../types';
 import { className, indexData, toMinutes } from './util';
+import { jeifInfo } from './jeif';
 import { workloadReport } from './workload';
 
 export type IssueCategory = 'cadastro' | 'matematica' | 'pendencia' | 'aviso';
@@ -133,7 +134,12 @@ export function checkData(data: AppData): Issue[] {
     const lessons = mine.reduce((s, a) => s + a.lessons, 0);
     const need = lessons + acts.reduce((s, r) => s + r.qty, 0);
     const av = t.availability;
-    const unav = new Set(av.unavailable);
+    const jeif = jeifInfo(data, t);
+    if (jeif.invalid) add('cadastro', `${t.name}: ${jeif.invalid}`, 'Corrija o horário do agrupamento em "Configuração da escola".', 'escola');
+    if (jeif.missingTimes.length)
+      add('cadastro', `${t.name} faz JEIF (${jeif.group?.name}), mas o(s) período(s) ${jeif.missingTimes.join(', ')} não tem(têm) horários de início/término configurados. Sem eles, não é possível saber quais aulas coincidem com a JEIF.`,
+        'Configure os horários reais das aulas em "Cadastro de períodos".', 'periodos');
+    const unav = new Set([...av.unavailable, ...jeif.blocked]);
     let avail = 0;
     for (const pid of t.periodIds) {
       const p = ix.period.get(pid);
@@ -198,7 +204,7 @@ export function checkData(data: AppData): Issue[] {
       let slots = r.slots.length ? r.slots.filter((s) => s < n) : Array.from({ length: n }, (_, i) => i);
       if (r.position === 'meio') slots = slots.filter((s) => s !== 0 && s !== n - 1);
       const days = (r.days.length ? r.days : t.availability.workDays).filter((d) => t.availability.workDays.includes(d) && d < D);
-      const unav = new Set(t.availability.unavailable);
+      const unav = new Set([...t.availability.unavailable, ...jeifInfo(data, t).blocked]);
       let cnt = 0;
       for (const d of days) {
         let k = slots.filter((s) => !unav.has(`${r.periodId}|${d}|${s}`)).length;

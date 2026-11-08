@@ -1,4 +1,4 @@
-import type { AppData, Availability, Grade, Period, SchoolClass, Teacher, Workload } from '../types';
+import type { AppData, Availability, Grade, JeifGroup, Period, SchoolClass, Teacher, Workload } from '../types';
 import { uid } from './util';
 
 export const PALETTE = [
@@ -34,7 +34,17 @@ export function newWorkload(): Workload {
 }
 
 export function newTeacher(name: string, periodIds: string[], days: number): Teacher {
-  return { id: uid('prof'), name, subjectIds: [], periodIds, workload: newWorkload(), availability: newAvailability(days), notes: '' };
+  return { id: uid('prof'), name, subjectIds: [], periodIds, jeifGroupId: null, workload: newWorkload(), availability: newAvailability(days), notes: '' };
+}
+
+/** Agrupamentos de JEIF informados pela escola (editáveis em Configuração da escola). */
+export function defaultJeifGroups(): JeifGroup[] {
+  const segQui = [0, 1, 2, 3];
+  return [
+    { id: 'jeif_1', name: 'Grupo I', start: '10:30', end: '12:00', days: segQui, noGapBefore: false },
+    { id: 'jeif_2', name: 'Grupo II', start: '14:00', end: '15:30', days: segQui, noGapBefore: false },
+    { id: 'jeif_3', name: 'Grupo III', start: '19:00', end: '20:30', days: segQui, noGapBefore: true },
+  ];
 }
 
 export function makeClass(periodId: string, grade: Grade, letter: string, weekly: number, freePolicy: SchoolClass['freePolicy'] = 'livre'): SchoolClass {
@@ -86,6 +96,7 @@ export function initialData(): AppData {
         },
       },
       defaultFreePolicy: 'livre',
+      jeifGroups: defaultJeifGroups(),
       solver: { timeLimit: 30, strategies: ['janelas', 'dias', 'distribuicao', 'equilibrada'], serverUrl: '' },
     },
     periods: [manha, tarde],

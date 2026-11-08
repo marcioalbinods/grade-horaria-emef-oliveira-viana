@@ -1,7 +1,7 @@
 import { Fragment, useEffect, useMemo, useState } from 'react';
 import { create } from 'zustand';
 import { Badge, Card, Check, confirmDialog, IssueList, NumInput, PageHeader } from '../components/ui';
-import { cancelJob, getJob, health, LOCAL_SERVER, servedLocally, startSolve, type Diagnosis, type Job } from '../logic/api';
+import { cancelJob, getJob, health, LOCAL_SERVER, REQUIRED_FEATURES, servedLocally, startSolve, type Diagnosis, type Job } from '../logic/api';
 import { checkData, isBlocking } from '../logic/checks';
 import { validateSchedule } from '../logic/conflicts';
 import { computeMetrics, CRITERIA_WEIGHTS, STRATEGIES, type Metrics } from '../logic/metrics';
@@ -170,7 +170,12 @@ export default function SolvePage() {
   const checkServer = () => {
     setServer(null);
     health(opts.serverUrl)
-      .then((h) => setServer({ ok: true, text: `Motor de otimização conectado (Google OR-Tools ${h.ortools}, ${h.solver}).` }))
+      .then((h) => {
+        const missing = REQUIRED_FEATURES.filter((f) => !(h.features ?? []).includes(f));
+        if (missing.length)
+          setServer({ ok: false, text: 'O motor de otimização instalado neste computador é de uma versão antiga e não conhece a JEIF. Baixe a versão atual do sistema (arquivo ZIP no GitHub), substitua a pasta e abra o "iniciar" novamente.' });
+        else setServer({ ok: true, text: `Motor de otimização conectado (versão ${h.version}, Google OR-Tools ${h.ortools}, ${h.solver}).` });
+      })
       .catch((e) => setServer({ ok: false, text: String(e.message ?? e) }));
   };
   useEffect(checkServer, [opts.serverUrl]);

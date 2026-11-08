@@ -1,5 +1,6 @@
 // Converte os dados da aplicação no formato aceito pelo motor de otimização.
 import type { AppData, Entry, StrategyId } from '../types';
+import { jeifInfo } from './jeif';
 import { parseSlotKey } from './util';
 
 export interface SolveOptions {
@@ -25,6 +26,7 @@ export function buildProblem(data: AppData, opts: SolveOptions) {
       return [p, d, s] as [string, number, number];
     };
     const validKey = ([p, d, s]: [string, number, number]) => periodIds.has(p) && d < D && s < (nslots.get(p) ?? 0);
+    const jeif = jeifInfo(data, t);
     return {
       id: t.id,
       name: t.name,
@@ -40,6 +42,9 @@ export function buildProblem(data: AppData, opts: SolveOptions) {
       maxDays: av.maxDays,
       preferConsecutive: av.preferConsecutive,
       avoidGaps: av.avoidGaps,
+      jeifName: jeif.group?.name ?? null,
+      jeifBlocked: [...jeif.blocked].map(key3).filter(validKey),
+      jeifNoGap: jeif.noGap.filter((x) => x.day < D).map((x) => [x.periodId, x.day] as [string, number]),
     };
   });
   const teacherIds = new Set(teachers.map((t) => t.id));

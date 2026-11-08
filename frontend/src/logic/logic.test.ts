@@ -17,6 +17,8 @@ import { buildProblem } from './payload';
 import { buildReport, REPORTS } from './reports';
 import { entryKey } from './util';
 import { workloadReport } from './workload';
+import { jeifInfo } from './jeif';
+import { findJeif } from './importer';
 
 const here = dirname(fileURLToPath(import.meta.url));
 
@@ -30,7 +32,7 @@ function tiny(): { data: AppData; entries: Entry[] } {
   c2.weeklyLessons = 2;
   d.subjects = [{ id: 's1', name: 'Matemática', short: 'MAT', color: '#2563eb' }];
   d.teachers = [
-    { id: 't1', name: 'Ana', subjectIds: ['s1'], periodIds: ['per_tarde'], notes: '', workload: { total: 4, regular: 4, ha: null, cch: null, hl: 1, others: [] },
+    { id: 't1', name: 'Ana', subjectIds: ['s1'], periodIds: ['per_tarde'], notes: '', jeifGroupId: null, workload: { total: 4, regular: 4, ha: null, cch: null, hl: 1, others: [] },
       availability: { workDays: [0, 1, 2, 3, 4], unavailable: ['per_tarde|1|0'], avoid: [], entry: {}, exit: {}, maxDaily: null, maxConsecutive: null, preferredDays: [], maxDays: null, preferConsecutive: false, avoidGaps: true } },
   ];
   d.assignments = [
@@ -278,5 +280,99 @@ describe('relatórios e exportação', () => {
     expect(pdf.output('arraybuffer').byteLength).toBeGreaterThan(1000);
     const csv = reportToCsv(buildReport(data, sch, 'livres'));
     expect(csv).toMatch(/Horários livres por turma/);
+  });
+});
+
+describe('JEIF', () => {
+  /** Tarde: 6 aulas de 13:30 a 18:20 (intervalo 15:45–16:05). */
+  function comHorarios() {
+    const { data, entries } = tiny();
+    data.periods[1].slots = demoData().periods[1].slots;
+    data.periods[0].slots = demoData().periods[0].slots;
+    return { data, entries };
+  }
+
+  it('estrutura inicial tem os três agrupamentos informados e professores começam sem JEIF', () => {
+    const d = initialData();
+    expect(d.school.jeifGroups.map((g) => [g.name, g.start, g.end, g.days.join(',')])).toEqual([
+      ['Grupo I', '10:30', '12:00', '0,1,2,3'], ['Grupo II', '14:00', '15:30', '0,1,2,3'], ['Grupo III', '19:00', '20:30', '0,1,2,3'],
+    ]);
+    expect(d.school.jeifGroups.filter((g) => g.noGapBefore).map((g) => g.name)).toEqual(['Grupo III']);
+  });
+
+  it('dados já salvos (sem JEIF) são mantidos e recebem os campos novos', () => {
+    const antigo = JSON.parse(JSON.stringify(initialData()));
+    delete antigo.school.jeifGroups;
+    antigo.classes[0].weeklyLessons = 33; // edição feita pelo usuário
+    antigo.classes = antigo.classes.slice(0, 20);
+    antigo.teachers = [{ id: 'x', name: 'Prof', periodIds: ['per_manha'], subjectIds: [], workload: {}, availability: {} }];
+    const n = normalizeData(antigo);
+    expect(n.classes).toHaveLength(20);
+    expect(n.classes[0].weeklyLessons).toBe(33);
+    expect(n.school.jeifGroups).toHaveLength(3);
+    expect(n.teachers[0].jeifGroupId).toBeNull();
+  });
+
+  it('Grupo II bloqueia as aulas da tarde que coincidem com 14h–15h30, só de segunda a quinta', () => {
+    const { data } = comHorarios();
+    data.teachers[0].jeifGroupId = 'jeif_2';
+    const info = jeifInfo(data, data.teachers[0]);
+    // 13:30–14:15, 14:15–15:00 e 15:00–15:45 coincidem; seg a qui = 4 dias
+    expect(info.blocked.size).toBe(12);
+    expect(info.blocked.has('per_tarde|0|0')).toBe(true);
+    expect(info.blocked.has('per_tarde|3|2')).toBe(true);
+    expect(info.blocked.has('per_tarde|0|3')).toBe(false);
+    expect(info.blocked.has('per_tarde|4|0')).toBe(false); // sexta livre
+    expect(info.noGap).toEqual([]);
+  });
+
+  it('Grupo III não bloqueia aulas da tarde, mas exige aulas até a última aula de seg a qui', () => {
+    const { data } = comHorarios();
+    data.teachers[0].jeifGroupId = 'jeif_3';
+    const info = jeifInfo(data, data.teachers[0]);
+    expect(info.blocked.size).toBe(0);
+    expect(info.noGap).toEqual([0, 1, 2, 3].map((day) => ({ periodId: 'per_tarde', day })));
+    // professor só da manhã no Grupo III: a regra não se aplica (a manhã não é o período anterior à JEIF)
+    data.teachers[0].periodIds = ['per_manha'];
+    expect(jeifInfo(data, data.teachers[0]).noGap).toEqual([]);
+  });
+
+  it('sem horários cadastrados, a JEIF vira erro de cadastro (não dá para saber o que coincide)', () => {
+    const { data } = tiny();
+    data.teachers[0].jeifGroupId = 'jeif_2';
+    expect(checkData(data).some((i) => i.category === 'cadastro' && /JEIF/.test(i.message))).toBe(true);
+  });
+
+  it('validação acusa aula em horário de JEIF e horário vago antes da JEIF do Grupo III', () => {
+    const { data, entries } = comHorarios();
+    data.teachers[0].jeifGroupId = 'jeif_2';
+    // a1 está na segunda 2ª aula (14:15–15:00) → coincide com a JEIF
+    expect(validateSchedule(data, entries).some((v) => v.severity === 'conflito' && /está em JEIF/.test(v.message))).toBe(true);
+    data.teachers[0].jeifGroupId = 'jeif_3';
+    // segunda: ocupa 0..3, mas as aulas 5ª e 6ª ficam vagas antes da JEIF
+    const viol = validateSchedule(data, entries).filter((v) => /horário vago entre suas aulas/.test(v.message));
+    expect(viol).toHaveLength(2); // segunda e quarta
+    // levando as aulas até a última aula, o conflito desaparece
+    const ok: Entry[] = [
+      { kind: 'atividade', refId: 'r1', periodId: 'per_tarde', day: 0, slot: 5 },
+      { kind: 'aula', refId: 'a1', periodId: 'per_tarde', day: 0, slot: 4 },
+      { kind: 'aula', refId: 'a2', periodId: 'per_tarde', day: 0, slot: 3 },
+      { kind: 'aula', refId: 'a2', periodId: 'per_tarde', day: 0, slot: 2 },
+      { kind: 'aula', refId: 'a1', periodId: 'per_tarde', day: 4, slot: 1 }, // sexta: sem JEIF
+    ];
+    expect(validateSchedule(data, ok).filter((v) => /JEIF/.test(v.message))).toEqual([]);
+  });
+
+  it('JEIF segue para o motor e é reconhecida na importação de planilhas', () => {
+    const { data } = comHorarios();
+    data.teachers[0].jeifGroupId = 'jeif_2';
+    const p = buildProblem(data, { strategies: ['janelas'], timeLimit: 10, locks: [] });
+    expect(p.teachers[0].jeifName).toBe('Grupo II');
+    expect(p.teachers[0].jeifBlocked).toHaveLength(12);
+    expect(findJeif(data, 'Grupo III')).toBe('jeif_3');
+    expect(findJeif(data, 'iii')).toBe('jeif_3');
+    expect(findJeif(data, '2')).toBe('jeif_2');
+    expect(findJeif(data, '')).toBeUndefined();
+    expect(findJeif(data, 'Grupo IX')).toBeNull();
   });
 });

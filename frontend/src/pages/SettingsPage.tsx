@@ -136,9 +136,10 @@ function exportAll(data: AppData) {
   const add = (name: string, rows: (string | number | null)[][]) => XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(rows), name);
   add('Disciplinas', [['Nome', 'Sigla', 'Cor'], ...data.subjects.map((s) => [s.name, s.short, s.color])]);
   add('Turmas', [['Período', 'Ano/Série', 'Turma', 'Aulas semanais', 'Aulas diárias (máx.)', 'Nome'], ...data.classes.map((c) => [per(c.periodId), data.grades.find((g) => g.id === c.gradeId)?.name ?? '', c.letter, c.weeklyLessons, c.dailyMax, c.name])]);
-  add('Professores', [['Nome', 'Disciplinas', 'Períodos', 'Dias de trabalho', 'Carga total', 'Aulas regulares', 'H.A.', 'CCH', 'HL'], ...data.teachers.map((t) => [
+  add('Professores', [['Nome', 'Disciplinas', 'Períodos', 'Dias de trabalho', 'Carga total', 'Aulas regulares', 'H.A.', 'CCH', 'HL', 'JEIF'], ...data.teachers.map((t) => [
     t.name, t.subjectIds.map(sub).join(';'), t.periodIds.map(per).join(';'), t.availability.workDays.map((d) => data.school.days[d]?.slice(0, 3)).join(';'),
-    t.workload.total, t.workload.regular, t.workload.ha, t.workload.cch, t.workload.hl])]);
+    t.workload.total, t.workload.regular, t.workload.ha, t.workload.cch, t.workload.hl,
+    data.school.jeifGroups.find((g) => g.id === t.jeifGroupId)?.name ?? ''])]);
   add('Atribuições', [['Professor', 'Período', 'Turma', 'Disciplina', 'Aulas semanais', 'Máx. por dia'], ...data.assignments.map((a) => {
     const c = data.classes.find((x) => x.id === a.classId);
     return [tea(a.teacherId), per(c?.periodId ?? ''), c?.name ?? '', sub(a.subjectId), a.lessons, a.maxPerDay];

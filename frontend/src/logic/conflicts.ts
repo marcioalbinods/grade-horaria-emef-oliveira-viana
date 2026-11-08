@@ -1,5 +1,6 @@
 // Validação de uma grade (gerada ou editada manualmente) contra os dados atuais.
 import type { AppData, Entry } from '../types';
+import { jeifInfo, type JeifInfo } from './jeif';
 import { className, entryKey, indexData, periodOverlaps, type DataIndex } from './util';
 
 export interface Violation {
@@ -44,6 +45,11 @@ export function validateSchedule(data: AppData, entries: Entry[]): Violation[] {
   const tName = (id: string | null) => (id ? ix.teacher.get(id)?.name ?? '?' : '?');
   const where = (e: Entry) => `${DAY(data, e.day)}, ${e.slot + 1}ª aula (${ix.period.get(e.periodId)?.name ?? '?'})`;
 
+  const jeifCache = new Map<string, JeifInfo>();
+  const jeifOf = (tid: string) => {
+    if (!jeifCache.has(tid)) jeifCache.set(tid, jeifInfo(data, ix.teacher.get(tid)!));
+    return jeifCache.get(tid)!;
+  };
   const classOcc = new Map<string, EntryInfo[]>();
   const teacherOcc = new Map<string, EntryInfo[]>();
   const valid: EntryInfo[] = [];
@@ -111,6 +117,8 @@ export function validateSchedule(data: AppData, entries: Entry[]): Violation[] {
       if (!t.periodIds.includes(e.periodId)) msgs.push(`não trabalha no período ${ix.period.get(e.periodId)?.name}`);
       if (!av.workDays.includes(e.day)) msgs.push(`não trabalha às ${DAY(data, e.day).toLowerCase()}s`);
       if (av.unavailable.includes(`${e.periodId}|${e.day}|${e.slot}`)) msgs.push('está indisponível neste horário');
+      const jf = jeifOf(t.id);
+      if (jf.blocked.has(`${e.periodId}|${e.day}|${e.slot}`)) msgs.push(`está em JEIF (${jf.group?.name}, ${jf.group?.start}–${jf.group?.end}) neste horário`);
       const lo = av.entry[e.periodId], hi = av.exit[e.periodId];
       if (lo != null && e.slot < lo) msgs.push(`só pode começar a partir da ${lo + 1}ª aula`);
       if (hi != null && e.slot > hi) msgs.push(`precisa sair após a ${hi + 1}ª aula`);
@@ -158,6 +166,26 @@ export function validateSchedule(data: AppData, entries: Entry[]): Violation[] {
             entries: [...teacherOcc.get(k1)!, ...teacherOcc.get(k2)!].map((x) => x.key),
           });
         }
+  }
+
+  // ---- JEIF: sem horário vago entre as aulas do período anterior e a JEIF
+  for (const t of data.teachers) {
+    const jf = jeifOf(t.id);
+    for (const { periodId, day } of jf.noGap) {
+      const n = ix.period.get(periodId)?.slots.length ?? 0;
+      const occ: number[] = [];
+      for (let s = 0; s < n; s++) if (teacherOcc.has(`${t.id}|${periodId}|${day}|${s}`)) occ.push(s);
+      if (!occ.length) continue;
+      const first = Math.min(...occ);
+      const vagas: number[] = [];
+      for (let s = first; s < n; s++) if (!occ.includes(s)) vagas.push(s + 1);
+      if (vagas.length)
+        out.push({
+          severity: 'conflito',
+          message: `${t.name} (JEIF ${jf.group?.name} às ${jf.group?.start}) tem horário vago entre suas aulas do período ${ix.period.get(periodId)?.name} e a JEIF em ${DAY(data, day)} (${vagas.map((v) => v + 'ª').join(', ')} aula). As aulas desse dia devem seguir até a última aula do período.`,
+          entries: occ.flatMap((s) => teacherOcc.get(`${t.id}|${periodId}|${day}|${s}`)!.map((x) => x.key)),
+        });
+    }
   }
 
   // ---- limites diários e contagens

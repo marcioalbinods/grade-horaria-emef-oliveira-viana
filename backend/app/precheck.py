@@ -98,7 +98,7 @@ def precheck(p: ProblemIn) -> list[Issue]:
         mine = [a for a in valid_assign if a.teacherId == t.id]
         acts = [r for r in p.activities if r.teacherId == t.id]
         need = sum(a.lessons for a in mine) + sum(r.qty for r in acts)
-        unav = {tuple(u) for u in t.unavailable}
+        unav = {tuple(u) for u in t.unavailable} | {tuple(u) for u in t.jeifBlocked}
         avail = 0
         for pid in t.periodIds:
             n = len(periods[pid].slots)
@@ -125,7 +125,7 @@ def precheck(p: ProblemIn) -> list[Issue]:
         c, t = classes[a.classId], teachers[a.teacherId]
         n = len(periods[c.periodId].slots)
         blocked = {tuple(b) for b in c.blocked}
-        unav = {tuple(u) for u in t.unavailable}
+        unav = {tuple(u) for u in t.unavailable} | {tuple(u) for u in t.jeifBlocked}
         lo = t.entry.get(c.periodId, 0)
         hi = t.exit.get(c.periodId, n - 1)
         per_day = []
@@ -156,7 +156,7 @@ def precheck(p: ProblemIn) -> list[Issue]:
         slots = set(r.slots) if r.slots else set(range(n))
         if r.position == "meio":
             slots -= {0, n - 1}
-        unav = {tuple(u) for u in t.unavailable}
+        unav = {tuple(u) for u in t.unavailable} | {tuple(u) for u in t.jeifBlocked}
         cnt = 0
         for d in days & set(t.workDays):
             k = sum(1 for s in slots if 0 <= s < n and (r.periodId, d, s) not in unav)

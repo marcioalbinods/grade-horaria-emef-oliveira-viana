@@ -5,6 +5,7 @@ import { validateSchedule } from './conflicts';
 import { computeMetrics } from './metrics';
 import { ACTIVITY_LABELS, className, indexData, slotTime, sortedClasses } from './util';
 import { fmtNumber, workloadReport } from './workload';
+import { jeifInfo, jeifLabel } from './jeif';
 
 export interface ReportTable {
   title: string;
@@ -98,6 +99,7 @@ export function buildReport(data: AppData, schedule: Schedule | null, id: string
       for (const t of [...data.teachers].sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'))) {
         const s = metrics?.teachers.get(t.id);
         const wr = workloadReport(data, t);
+        const jf = jeifInfo(data, t);
         for (const pid of t.periodIds) {
           const p = ix.period.get(pid);
           if (!p) continue;
@@ -114,7 +116,7 @@ export function buildReport(data: AppData, schedule: Schedule | null, id: string
               const e = entries.find((x) => x.day === d && x.slot === sIdx && x.periodId === pid && entryTeacher(ix, x) === t.id);
               if (!e) {
                 const sp = span[d];
-                row.push(sp && sIdx > sp[0] && sIdx < sp[1] ? 'Janela' : '');
+                row.push(jf.blocked.has(`${pid}|${d}|${sIdx}`) ? 'JEIF' : sp && sIdx > sp[0] && sIdx < sp[1] ? 'Janela' : '');
                 col.push(null);
               } else if (e.kind === 'aula') {
                 const a = ix.assignment.get(e.refId)!;
@@ -133,7 +135,7 @@ export function buildReport(data: AppData, schedule: Schedule | null, id: string
           const acts = s?.activities ?? {};
           tables.push({
             title: `${t.name} — ${p.name}`,
-            subtitle: `Aulas: ${s?.lessons ?? 0} · H.A.: ${acts.HA ?? 0} · CCH: ${acts.CCH ?? 0} · HL: ${acts.HL ?? 0} · Janelas: ${s?.gaps ?? 0} · Dias: ${s?.days ?? 0} · Carga contabilizada: ${fmtNumber(wr.computedTotal)} ${wr.unit}`,
+            subtitle: `Aulas: ${s?.lessons ?? 0} · H.A.: ${acts.HA ?? 0} · CCH: ${acts.CCH ?? 0} · HL: ${acts.HL ?? 0} · Janelas: ${s?.gaps ?? 0} · Dias: ${s?.days ?? 0} · Carga contabilizada: ${fmtNumber(wr.computedTotal)} ${wr.unit} · JEIF: ${jeifLabel(jf.group, days)}`,
             head: ['Aula', 'Horário', ...days], rows, colors, grid: true,
           });
         }

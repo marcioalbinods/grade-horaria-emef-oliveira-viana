@@ -90,8 +90,11 @@ async function req<T>(url: string, init?: RequestInit): Promise<T> {
   return res.json() as Promise<T>;
 }
 
+/** Recursos que esta versão da interface exige do motor. */
+export const REQUIRED_FEATURES = ['jeif'];
+
 export function health(serverUrl: string) {
-  return req<{ ok: boolean; ortools: string; solver: string }>(`${base(serverUrl)}/api/health`);
+  return req<{ ok: boolean; ortools: string; solver: string; version?: string; features?: string[] }>(`${base(serverUrl)}/api/health`);
 }
 
 export function startSolve(serverUrl: string, problem: Problem) {

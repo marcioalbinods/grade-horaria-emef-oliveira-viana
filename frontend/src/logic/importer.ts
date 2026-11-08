@@ -23,7 +23,7 @@ export type SheetName = 'Disciplinas' | 'Turmas' | 'Professores' | 'Atribuiçõe
 export const SHEETS: Record<SheetName, string[]> = {
   Disciplinas: ['Nome', 'Sigla', 'Cor'],
   Turmas: ['Período', 'Ano/Série', 'Turma', 'Aulas semanais', 'Aulas diárias (máx.)'],
-  Professores: ['Nome', 'Disciplinas', 'Períodos', 'Dias de trabalho', 'Carga total', 'Aulas regulares', 'H.A.', 'CCH', 'HL'],
+  Professores: ['Nome', 'Disciplinas', 'Períodos', 'Dias de trabalho', 'Carga total', 'Aulas regulares', 'H.A.', 'CCH', 'HL', 'JEIF'],
   Atribuições: ['Professor', 'Período', 'Turma', 'Disciplina', 'Aulas semanais', 'Máx. por dia'],
 };
 
@@ -31,6 +31,18 @@ export const norm = (s: unknown) =>
   String(s ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/\s+/g, ' ').trim();
 
 const DAY_ALIASES = ['seg', 'ter', 'qua', 'qui', 'sex', 'sab', 'dom'];
+
+const ROMAN: Record<string, string> = { '1': 'i', '2': 'ii', '3': 'iii', '4': 'iv', '5': 'v' };
+/** Encontra o agrupamento de JEIF pelo nome ("Grupo III", "III", "3"). undefined = não informado; null = não encontrado. */
+export function findJeif(data: AppData, s: string): string | null | undefined {
+  const v = norm(s);
+  if (!v || ['nao', 'não', 'nenhum', 'nao faz', '-'].includes(v)) return undefined;
+  const key = (x: string) => {
+    const k = norm(x).replace(/^grupo\s*/, '');
+    return ROMAN[k] ?? k;
+  };
+  return data.school.jeifGroups.find((g) => key(g.name) === key(v))?.id ?? null;
+}
 
 export function templateWorkbook(): XLSX.WorkBook {
   const wb = XLSX.utils.book_new();
@@ -40,7 +52,7 @@ export function templateWorkbook(): XLSX.WorkBook {
     ['Preencha as abas abaixo (não altere os títulos das colunas). Linhas vazias são ignoradas.'],
     ['Disciplinas: Nome (obrigatório), Sigla, Cor (ex.: #2563eb).'],
     ['Turmas: Período (ex.: Manhã), Ano/Série (ex.: 1º ano), Turma (letra ou nome, ex.: A), Aulas semanais, Aulas diárias (máx., opcional).'],
-    ['Professores: Nome, Disciplinas (separadas por ";"), Períodos (ex.: Manhã;Tarde), Dias de trabalho (ex.: Seg;Ter;Qua), Carga total, Aulas regulares, H.A., CCH, HL.'],
+    ['Professores: Nome, Disciplinas (separadas por ";"), Períodos (ex.: Manhã;Tarde), Dias de trabalho (ex.: Seg;Ter;Qua), Carga total, Aulas regulares, H.A., CCH, HL, JEIF (Grupo I, Grupo II, Grupo III ou vazio).'],
     ['Atribuições: Professor, Período, Turma (ex.: 1º A), Disciplina, Aulas semanais, Máx. por dia (opcional).'],
     [''],
     ['Registros já existentes (mesmo nome) são atualizados. A prévia mostra tudo antes de confirmar.'],
@@ -158,6 +170,7 @@ export function previewImport(data: AppData, buf: ArrayBuffer): ImportPreview {
         if (!DAY_ALIASES.includes(norm(dn).slice(0, 3)) || DAY_ALIASES.indexOf(norm(dn).slice(0, 3)) >= data.school.days.length) { pr.status = 'erro'; pr.messages.push(`Dia "${dn}" inválido.`); }
       for (const sn of values['Disciplinas'].split(/[;,]/).map((x) => x.trim()).filter(Boolean))
         if (!subjFile.has(norm(sn)) && !data.subjects.some((s) => norm(s.name) === norm(sn) || norm(s.short) === norm(sn))) pr.messages.push(`Disciplina "${sn}" não existe: será criada.`);
+      if (findJeif(data, values.JEIF ?? '') === null) { pr.status = 'erro'; pr.messages.push(`Agrupamento de JEIF "${values.JEIF}" não existe (use Grupo I, Grupo II ou Grupo III).`); }
       for (const c of ['Carga total', 'Aulas regulares', 'H.A.', 'CCH', 'HL'])
         if (numOrNull(values[c]) === 'erro') { pr.status = 'erro'; pr.messages.push(`${c}: valor inválido.`); }
       if (pr.status !== 'erro') {
@@ -283,6 +296,7 @@ export function applyImport(d: AppData, preview: ImportPreview): { created: numb
         if (v['H.A.'] !== '') t.workload.ha = n(v['H.A.']);
         if (v.CCH !== '') t.workload.cch = n(v.CCH);
         if (v.HL !== '') t.workload.hl = n(v.HL);
+        if ((v.JEIF ?? '') !== '') t.jeifGroupId = findJeif(d, v.JEIF) ?? null;
       } else {
         const p = findPeriod(d, v['Período'])!;
         const c = d.classes.find((c) => c.periodId === p.id && norm(c.name) === norm(v.Turma));
